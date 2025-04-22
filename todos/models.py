@@ -7,9 +7,11 @@ User = get_user_model()
 
 
 class Tag(models.Model):
-    name = models.CharField(max_length=50, unique=True)
-    color = models.CharField(max_length=7, default='#FFFFFF')
-    created_at = models.DateTimeField(auto_now_add=True)
+    name = models.CharField(max_length=50, unique=True, verbose_name=_('Name'))
+    color = models.CharField(
+        max_length=7, default='#FFFFFF', verbose_name=_('Color'))
+    created_at = models.DateTimeField(
+        auto_now_add=True, verbose_name=_('Created At'))
 
     def __str__(self):
         return self.name
@@ -42,13 +44,13 @@ class Todo(models.Model):
     created_at = models.DateTimeField(
         auto_now_add=True, verbose_name=_('Created At'))
     updated_at = models.DateTimeField(
-        auto_now=True, verbose_name=_('Description'))
+        auto_now=True, verbose_name=_('Updated At'))
     completed_at = models.DateTimeField(
-        blank=True, null=True, verbose_name=_('Description'))
+        blank=True, null=True, verbose_name=_('Completed At'))
     user = models.ForeignKey(
-        User, on_delete=models.CASCADE, related_name='todos', verbose_name=_('Description'))
+        User, on_delete=models.CASCADE, related_name='todos', verbose_name=_('User'))
     tags = models.ManyToManyField(
-        Tag, related_name='todos', blank=True, verbose_name=_('Description'))
+        Tag, related_name='todos', blank=True, verbose_name=_('Tags'))
 
     class Meta:
         ordering = ['-priority', 'due_date']
@@ -71,9 +73,11 @@ class Todo(models.Model):
 
 class TodoAttachment(models.Model):
     todo = models.ForeignKey(
-        Todo, on_delete=models.CASCADE, related_name='attachments')
-    file = models.FileField(upload_to='todo_attachments/')
-    uploaded_at = models.DateTimeField(auto_now_add=True)
+        Todo, on_delete=models.CASCADE, related_name='Attachments')
+    file = models.FileField(
+        upload_to='todo_attachments/', verbose_name=_('File'))
+    uploaded_at = models.DateTimeField(
+        auto_now_add=True, verbose_name=_('Updated At'))
 
     def __str__(self):
         return f"Attachment for {self.todo.title}"

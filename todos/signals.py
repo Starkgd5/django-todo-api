@@ -9,7 +9,9 @@ from .models import Todo
 def send_todo_notification(sender, instance, created, **kwargs):
     if created:
         subject = f'New Todo Created: {instance.title}'
-        message = f'You have created a new todo:\n\nTitle: {instance.title}\nPriority: {instance.get_priority_display()}\nDue Date: {instance.due_date}'
+        message = f'''You have created a new todo:\n\nTitle:
+        {instance.title}\nPriority: {instance.get_priority_display()}\nDue
+        Date: {instance.due_date}'''
         send_mail(
             subject,
             message,

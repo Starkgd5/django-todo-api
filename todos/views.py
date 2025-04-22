@@ -1,6 +1,7 @@
 import redis
 from django.conf import settings
 from django.db import connection
+from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from django.views.decorators.vary import vary_on_cookie
@@ -11,9 +12,8 @@ from drf_spectacular.utils import (OpenApiExample, OpenApiParameter,
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.throttling import ScopedRateThrottle, UserRateThrottle
 from rest_framework.views import APIView
 
 from .filters import TodoFilter
@@ -21,10 +21,11 @@ from .models import Tag, Todo
 from .serializers import (TagSerializer, TodoAttachmentSerializer,
                           TodoDetailSerializer, TodoSerializer,
                           TodoStatusUpdateSerializer)
+from .throttles import BurstRateThrottle, SustainedRateThrottle
 
 
 class HealthCheckView(APIView):
-    permission_classes = []
+    permission_classes = [AllowAny]
 
     def get(self, request):
         # Test database connection
@@ -52,14 +53,6 @@ class HealthCheckView(APIView):
         })
 
 
-class BurstRateThrottle(UserRateThrottle):
-    scope = 'burst'
-
-
-class SustainedRateThrottle(UserRateThrottle):
-    scope = 'sustained'
-
-
 class TagViewSet(viewsets.ModelViewSet):
     queryset = Tag.objects.all()
     serializer_class = TagSerializer
@@ -78,49 +71,16 @@ class TodoViewSet(viewsets.ModelViewSet):
     filterset_class = TodoFilter
     search_fields = ['title', 'description']
     ordering_fields = ['priority', 'due_date', 'created_at', 'updated_at']
-    throttle_classes = [BurstRateThrottle, SustainedRateThrottle]
+    if settings.DJANGO_SETTINGS_MODULE == 'core.settings.production':
+        throttle_classes = [BurstRateThrottle, SustainedRateThrottle]
+
+    def get_queryset(self):
+        return self.queryset.filter(user=self.request.user).select_related('user').prefetch_related('tags')
 
     @method_decorator(cache_page(60 * 15))
     @method_decorator(vary_on_cookie)
-    @extend_schema(
-        # extra parameters added to the schema
-        parameters=[
-            OpenApiParameter(
-                name='artist', description='Filter by artist', required=False, type=str),
-            OpenApiParameter(
-                name='release',
-                type=OpenApiTypes.DATE,
-                location=OpenApiParameter.QUERY,
-                description='Filter by release date',
-                examples=[
-                    OpenApiExample(
-                        'Example 1',
-                        summary='short optional summary',
-                        description='longer description',
-                        value='1993-08-23'
-                    ),
-                ],
-            ),
-        ],
-        # override default docstring extraction
-        description='More descriptive text',
-        # provide Authentication class that deviates from the views default
-        auth=None,
-        # change the auto-generated operation name
-        operation_id=None,
-        # or even completely override what AutoSchema would generate. Provide raw Open API spec as Dict.
-        operation=None,
-        # attach request/response examples to the operation.
-        examples=[
-            OpenApiExample(
-                'Example 1',
-                description='longer description',
-                value=''
-            ),
-        ],
-    )
-    def get_queryset(self):
-        return self.queryset.filter(user=self.request.user).select_related('user').prefetch_related('tags')
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
@@ -145,7 +105,6 @@ class TodoViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'])
     def overdue(self, request):
-        from django.utils import timezone
         overdue_todos = self.get_queryset().filter(
             due_date__lt=timezone.now(),
             status__in=['pending', 'in_progress']

@@ -1,7 +1,8 @@
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from rest_framework import serializers
 
-from .models import Tag, Todo
+from .models import Tag, Todo, TodoAttachment
 
 User = get_user_model()
 
@@ -39,14 +40,13 @@ class TodoSerializer(serializers.ModelSerializer):
 
     def get_days_remaining(self, obj):
         if obj.due_date:
-            from django.utils import timezone
+
             remaining = obj.due_date - timezone.now()
             return remaining.days
         return None
 
     def get_is_overdue(self, obj):
         if obj.due_date and obj.status != 'completed':
-            from django.utils import timezone
             return timezone.now() > obj.due_date
         return False
 
